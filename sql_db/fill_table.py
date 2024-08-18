@@ -1,19 +1,12 @@
 import pandas as pd
-import numpy as np
 import sqlite3
 
-def fill_table(curs, csv_path, table_name, table_columns, csv_columns):
-    ### Drops a table if it already exists
-    
-    csv_df = pd.read_csv(csv_path)
-
-    sql = """
-    INSERT INTO tSample (sample_id, site_id, BGR, collect_date) VALUES (:sample_id, :site_id, :BGR, :date)
-    ;"""
-
-    sql_insert = 'INSERT INTO ' + table_name + ' ('
-    sql_insert += (', '.join(table_columns)) + ') VALUES ('
-    sql_insert += ', '.join(f":{column}" for column in csv_columns) + ');' 
- 
-    for row in csv_df.to_dict(orient='records'):
-        curs.execute(sql_insert, row)
+def fill_table(cursor, df, table_name, table_columns):
+    try:
+        for index, row in df.iterrows():
+            values = [row[col] for col in table_columns]
+            placeholders = ', '.join(['?'] * len(values))
+            query = f"INSERT INTO {table_name} ({', '.join(table_columns)}) VALUES ({placeholders})"
+            cursor.execute(query, values)
+    except Exception as e:
+        print(f"Error filling table {table_name}: {e}")
