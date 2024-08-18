@@ -5,7 +5,7 @@ import uuid
 import pandas as pd
 
 curs, conn = create_database('test_db.db')
-csv_path = '../data/2022/heart_2022_no_nans.csv'
+csv_path = '../data/heart_health_data/2022/heart_2022_no_nans.csv'
 df = pd.read_csv(csv_path)
 
 ### Create table tPatients including patient demographic infomation
