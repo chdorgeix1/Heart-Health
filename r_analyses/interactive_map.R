@@ -21,8 +21,6 @@ result <- dbGetQuery(conn, sql_query)
 dbDisconnect(conn)
 
 
-
-
 result$HadHeartAttack <- ifelse(result$HadHeartAttack == "Yes", 1, 0)
 summary_data <- aggregate(HadHeartAttack ~ State, data = result, FUN = mean)
 
@@ -49,8 +47,12 @@ map <- tm_shape(us_states) +
               popup.vars = c("Proportion of Heart Attacks" = "ProportionHeartAttacks")) +
   tm_layout(title = "Map of Proportion of Heart Attacks by State")  # Add a title
 
+
+
 # Print the map
 print(map)
+
+tmap_save(map, "my_map.html")
 
 
 
