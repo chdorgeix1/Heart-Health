@@ -49,8 +49,6 @@ map <- tm_shape(us_states) +
               popup.vars = c("Proportion of Heart Attacks" = "ProportionHeartAttacks")) +
   tm_layout(title = "Map of Proportion of Heart Attacks by State")  # Add a title
 
-  
-  
 # Print the map
 print(map)
 
