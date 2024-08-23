@@ -2,4 +2,3 @@ The following project is designed to elucidate indicators of heart disease from 
 
 [Interactive Map](https://chdorgeix1.github.io/Heart-Health/my_map.html)
 
-
