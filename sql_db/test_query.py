@@ -10,9 +10,9 @@ for table in tables:
     print(table)
     query = "SELECT * FROM " + table[0] + ";"
     testdf = view_to_df(query, conn)
-    #print(testdf.head())
-    print(testdf.shape)
-    print('')
+    print(testdf.columns)
+    #print(testdf.shape)
+    #print('')
 
 ### Close Connection
 close_connection(conn)
