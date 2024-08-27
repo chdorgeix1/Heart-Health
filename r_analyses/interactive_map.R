@@ -4,6 +4,9 @@ library(RSQLite)
 library(DBI)
 library(sf)
 library(dplyr)
+#install.packages("remotes")
+#install_github("r-tmap/tmap")
+install.packages("tmap", repos = c("https://r-tmap.r-universe.dev", "https://cloud.r-project.org"))
 
 conn <- dbConnect(RSQLite::SQLite(), dbname = "./sql_db/test_db.db")
 
@@ -77,72 +80,85 @@ us_states$ProportionHeartAttacks <- us_states$ProportionHeartAttacks*100
 us_states$ProportionHeartAttacks <- round(us_states$ProportionHeartAttacks, 1)
 us_states$AverageAge <- round(us_states$AverageAge, 1)
 
-head(us_states)
 
-tmap_mode('view')
-
-# Create the map, coloring by ProportionHeartAttacks
-map <- tm_shape(us_states) +
-  tm_polygons(col = "ProportionHeartAttacks",  # Specify the column for coloring
-              palette = "YlOrRd",            # Choose a color palette
-              title = "Percent of Individuals Reporting Heart Attacks",
-              popup.vars = c("Proportion of Heart Attacks" = "ProportionHeartAttacks" , 
-                             'Total Respondents' = 'total_respondents',
-                             'Number of Heart Attacks in Respondents' = 'heart_attack_count',
-                             'State Population in 2022' = 'Pop_2022')) +
-  tm_shape(us_states) +
-  tm_polygons(col = "AverageAge",  # Specify the column for coloring
-              palette = "YlOrRd",            # Choose a color palette
-              title = "Percent of Individuals Reporting Heart Attacks",
-              popup.vars = c("Average Age" = "AverageAge")) +
-  tm_layout(title = "Map of Proportion of Heart Attacks by State")  # Add a title
-
-
-map <- map + tm_layers_control(
-  position = c("topright"),
-  basemaps = c("OpenStreetMap", "Esri.WorldImagery"),
-  overlays = c("Heart Attack Proportion", "Average Age")
-)
-
-# Print the map
-print(map)
-
-tmap_save(map, "./generated_maps/interactive_US_map.html")
-
+### Combination of tmap, leaflet, and javascript to create interactive map
 tmap_mode("view")
 
-# Create the map with multiple layers
+us_states$geometry <- sf::st_make_valid(us_states$geometry)
+
+library(htmlwidgets)
+
 map <- tm_shape(us_states) +
-  tm_polygons(col = "ProportionHeartAttacks",  
-              palette = "YlOrRd",            
-              title = "Percent of Individuals Reporting Heart Attacks",
-              id = "name",  # Optional: to add labels on hover
-              group = "Heart Attack Proportion",  # Group name for toggling
-              
-              popup.vars = c("Proportion of Heart Attacks" = "ProportionHeartAttacks", 
-                             'Total Respondents' = 'total_respondents',
-                             'Number of Heart Attacks in Respondents' = 'heart_attack_count',
-                             'State Population in 2022' = 'Pop_2022')) +
+  tm_polygons(fill = "ProportionHeartAttacks", 
+              group = "Proportion Heart Attacks",
+              group.control = 'radio',
+              fill.scale = tm_scale_continuous(values = "reds"),
+              fill.legend = tm_legend(title = "Proportion Heart Attacks", 
+                                      orientation = "landscape",
+                                      position = tm_pos_out("center", "bottom"), 
+                                      frame = FALSE)) +
   tm_shape(us_states) +
-  tm_polygons(col = "AverageAge",  
-              palette = "Blues",            
-              title = "Average Age",
-              id = "name",  # Optional: to add labels on hover
-              group = "Average Age",  # Group name for toggling
-              popup.vars = c("Average Age" = "AverageAge")) +
-  tm_layout(title = "Map of Health Data by State", legend.outside=TRUE)
+  tm_polygons(fill = "AverageAge", 
+              group = "Average Age",
+              group.control = 'radio',
+              fill.scale = tm_scale_continuous(values = "greens"),
+              fill.legend = tm_legend(title = "Average Age", 
+                                      orientation = "landscape",
+                                      position = tm_pos_out("center", "bottom"), 
+                                      frame = FALSE)) +
+  tm_basemap('OpenStreetMap', group.control = 'none')
 
-# Print the map
-print(map)
+leaflet_map <- tmap_leaflet(map)
+leaflet_map <- leaflet_map %>%
+  onRender("
+    function(el, x) {
+      var map = this;
 
+      // Function to hide all legends
+      function hideAllLegends() {
+        var legends = document.getElementsByClassName('info legend leaflet-control');
+        for (var i = 0; i < legends.length; i++) {
+          legends[i].style.display = 'none';
+        }
+      }
+
+      // Hide all legends when the map loads
+      hideAllLegends();
+
+      function showInitialLegend() {
+        var activeLayers = [];
+        map.eachLayer(function(layer) {
+          if (layer.options && layer.options.group && map.hasLayer(layer)) {
+            activeLayers.push(layer.options.group);
+          }
+        });
+
+        if (activeLayers.length > 0) {
+          var legends = document.getElementsByClassName('info legend leaflet-control');
+          for (var i = 0; i < legends.length; i++) {
+            if (legends[i].innerHTML.includes(activeLayers[0])) {
+              legends[i].style.display = 'block';
+              break;
+            }
+          }
+        } else {
+        }
+      }
+      
+      showInitialLegend();
   
-  
-  
-  
-  
-  
+      // Update legends when layer changes
+      map.on('baselayerchange', function (e) {
+        hideAllLegends();
+        var legends = document.getElementsByClassName('info legend leaflet-control');
+        for (var i = 0; i < legends.length; i++) {
+          if (legends[i].innerHTML.includes(e.name)) {
+            legends[i].style.display = 'block';
+          }
+        }
+      });
+    }
+  ")
 
-
-
-
-
+leaflet_map
+saveWidget(leaflet_map, "./generated_maps/interactive_US_map_3.html")
