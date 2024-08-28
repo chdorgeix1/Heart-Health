@@ -4,9 +4,11 @@ library(RSQLite)
 library(DBI)
 library(sf)
 library(dplyr)
+library(htmlwidgets)
 #install.packages("remotes")
-#install_github("r-tmap/tmap")
-install.packages("tmap", repos = c("https://r-tmap.r-universe.dev", "https://cloud.r-project.org"))
+#remotes::install_github("r-tmap/tmap")
+
+#install.packages("tmap", repos = c("https://r-tmap.r-universe.dev", "https://cloud.r-project.org"))
 
 conn <- dbConnect(RSQLite::SQLite(), dbname = "./sql_db/test_db.db")
 
@@ -15,7 +17,10 @@ sql_query =
     p.State, 
     p.patient_id, 
     p.AgeCategory,
-    h.HadHeartAttack
+    h.HadHeartAttack,
+    h.HadDiabetes,
+    h.HadArthritis,
+    h.HadCOPD
 FROM 
     tPatients AS p
 INNER JOIN 
@@ -24,6 +29,17 @@ INNER JOIN
 query_df <- dbGetQuery(conn, sql_query)
 dbDisconnect(conn)
 
+# Generate Chronic Health Score for each Patient
+query_df$HadDiabetes <- ifelse(query_df$HadDiabetes == "Yes", 1, 0)
+query_df$HadArthritis <- ifelse(query_df$HadArthritis == "Yes", 1, 0)
+query_df$HadCOPD <- ifelse(query_df$HadCOPD == "Yes", 1, 0)
+query_df$ChronicHealthScore <- query_df$HadDiabetes + query_df$HadArthritis + query_df$HadCOPD
+
+chronic_health_summary <- aggregate(ChronicHealthScore ~ State, data = query_df, FUN = mean)
+chronic_health_summary
+
+
+# Generate Average Age Data
 age_list <- c("18", "25", "30", "35", "40", "45", "50", "55", "60", "65", "70", "75", "80")
 avg_ages <- c(21, 27, 32, 37, 42, 47, 52, 57, 62, 67, 72, 77, 85)  # 85 for "80 or older"
 age_map <- setNames(avg_ages, age_list)
@@ -73,22 +89,22 @@ us_states$Name <- gsub("<at><openparen>|<closeparen>", "", us_states$Name)
 us_states <- merge(us_states, heart_att_state_df, by.x = "Name", by.y = "State", all.x = TRUE, all.y = TRUE)  # Left join
 us_states <- merge(us_states, state_pop_data, by.x = "Name", by.y = "Location", all.x = TRUE, all.y = TRUE)  # Left join
 us_states <- merge(us_states, age_summary, by.x = "Name", by.y = "State", all.x = TRUE, all.y = TRUE)
-names(us_states)[5] <- "ProportionHeartAttacks"
+us_states <- merge(us_states, chronic_health_summary, by.x = "Name", by.y = "State", all.x = TRUE, all.y = TRUE)
+names(us_states)[names(us_states) == "heart_attack_proportion"] <- "ProportionHeartAttacks"
 us_states <- na.omit(us_states)
 us_states <- subset(us_states, !(Name %in% c("Guam", "Alaska", "Puerto Rico", "Hawaii")))
 us_states$ProportionHeartAttacks <- us_states$ProportionHeartAttacks*100
 us_states$ProportionHeartAttacks <- round(us_states$ProportionHeartAttacks, 1)
 us_states$AverageAge <- round(us_states$AverageAge, 1)
 
+us_states$geometry <- sf::st_make_valid(us_states$geometry)
+
+us_states$total_respondents
 
 ### Combination of tmap, leaflet, and javascript to create interactive map
 tmap_mode("view")
 
-us_states$geometry <- sf::st_make_valid(us_states$geometry)
-
-library(htmlwidgets)
-
-map <- tm_shape(us_states) +
+map <-  tm_shape(us_states) +
   tm_polygons(fill = "ProportionHeartAttacks", 
               group = "Proportion Heart Attacks",
               group.control = 'radio',
@@ -97,16 +113,38 @@ map <- tm_shape(us_states) +
                                       orientation = "landscape",
                                       position = tm_pos_out("center", "bottom"), 
                                       frame = FALSE)) +
-  tm_shape(us_states) +
+  tm_polygons(fill = "total_respondents", 
+              group = "Total Survey Respondents",
+              group.control = 'radio',
+              fill.scale = tm_scale_continuous(values = "oranges"),
+              fill.legend = tm_legend(title = "Total Survey Respondents", 
+                                      orientation = "landscape",
+                                      position = tm_pos_out("center", "bottom"), 
+                                      frame = FALSE)) +
+        
   tm_polygons(fill = "AverageAge", 
               group = "Average Age",
               group.control = 'radio',
-              fill.scale = tm_scale_continuous(values = "greens"),
+              fill.scale = tm_scale_continuous(values = "blues"),
               fill.legend = tm_legend(title = "Average Age", 
+                                      orientation = "landscape",
+                                      position = tm_pos_out("center", "bottom"), 
+                                      frame = TRUE)) +
+  tm_polygons(fill = "ChronicHealthScore", 
+              group = "Chronic Health Condition Score",
+              group.control = 'radio',
+              fill.scale = tm_scale_continuous(values = "greens"),
+              fill.legend = tm_legend(title = "Chronic Health Score", 
                                       orientation = "landscape",
                                       position = tm_pos_out("center", "bottom"), 
                                       frame = FALSE)) +
   tm_basemap('OpenStreetMap', group.control = 'none')
+map
+
+saveWidget(map, "../generated_maps/interactive_us_map_4.html")
+
+
+
 
 leaflet_map <- tmap_leaflet(map)
 leaflet_map <- leaflet_map %>%
