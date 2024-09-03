@@ -129,7 +129,7 @@ map <-  tm_shape(us_states) +
               fill.legend = tm_legend(title = "Average Age", 
                                       orientation = "landscape",
                                       position = tm_pos_out("center", "bottom"), 
-                                      frame = TRUE)) +
+                                      frame = FALSE)) +
   tm_polygons(fill = "ChronicHealthScore", 
               group = "Chronic Health Condition Score",
               group.control = 'radio',
