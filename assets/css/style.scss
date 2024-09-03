@@ -1,11 +1,8 @@
 ---
 ---
 
-/* Set the background color to light blue */
+@import "{{ site.theme }}";
+
 body {
-  background-color: #142dcc; /* Light blue color */
-  color: #333; /* Optional: Set text color for better readability */
-  font-family: Arial, sans-serif; /* Optional: Set a default font */
-  margin: 0; /* Remove default margin */
-  padding: 20px; /* Optional: Add some padding */
+  background: #a80921; // Replace with your desired color
 }
